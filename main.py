@@ -1,5 +1,6 @@
 import sys
 import time
+import argparse
 from threading import Thread
 
 import pandas as pd
@@ -8,38 +9,39 @@ from ibapi.contract import Contract
 
 import datacol
 
-def determine_expiry(trade_date: pd.Timestamp):
+def determine_expiry(trade_date: pd.Timestamp, date_roll=False):
     year = trade_date.year
-    if trade_date.month == 12 and trade_date.day > 10:
-        year = year +1
     month = trade_date.month
+    month_offset = 1 if date_roll else 0
     if month in (1,2,3):
-        if month == 3 and trade_date.day > 10:
+        if month > (3 - month_offset) or (month == 3 and trade_date.day > 10):
             return str(year) + '06'
         return str(year) + '03'
     if month in (4,5,6):
-            if month == 6 and trade_date.day > 10:
+            if month > (6 - month_offset) or (month == 6 and trade_date.day > 10):
                 return str(year) + '09'
             return str(year) + '06'
     if month in (7,8,9):
-        if month == 9 and trade_date.day > 10:
+        if month > (9 - month_offset) or (month == 9 and trade_date.day > 10):
             return str(year) + '12'
         return str(year) + '09'
     if month in (10,11,12):
-        if month == 12 and trade_date.day > 10:
+        if month > (12 - month_offset) or (month == 12 and trade_date.day > 10):
+            year = year +1
             return str(year) + '03'
         return str(year) + '12'
 
-def main():
-    symbol = sys.argv[1]
-    date = sys.argv[2]
-    thirty_min = False
+def main(args):
+    symbol = args.symbol
+    date = args.day
+    thirty_min = args.thirty_min
     file_name = symbol + '_' + date + '.bars'
-    if len(sys.argv) > 3:
-        thirty_min = True
+    if thirty_min:
         file_name = symbol + '_30_min_' + date + '.bars'
+    if args.date_roll:
+        file_name = file_name + 'T'
 
-    contract = get_contract(symbol, date)
+    contract = get_contract(symbol, date, args.date_roll)
 
     try:
         collector = datacol.Datacol()
@@ -66,14 +68,15 @@ def main():
     print("All done.")
 
 
-def get_contract(symbol:str, date):
+def get_contract(symbol:str, date, date_roll=False):
     contract = Contract()
     contract.symbol = symbol
     #contract.symbol = "ES"
     # contract.secType = 'CONTFUT'
     # contract.secType = 'FUT+CONTFUT'
     contract.secType = "FUT"
-    contract.lastTradeDateOrContractMonth = determine_expiry(pd.to_datetime(date))
+    contract.lastTradeDateOrContractMonth = determine_expiry(pd.to_datetime(date), date_roll)
+    print(contract.lastTradeDateOrContractMonth)
     # contract.lastTradeDateOrContractMonth = "201803"
     contract.exchange = "GLOBEX"
     contract.currency = "USD"
@@ -102,4 +105,12 @@ def five_sec_bars(collector, contract, date, outfile):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Load historical data for given symbol.')
+    parser.add_argument('symbol', type=str, help='a symbol to collect')
+    parser.add_argument('day', type=str, help='A day for which to collect')
+    parser.add_argument('--30', dest='thirty_min', action='store_true')
+    parser.add_argument('--date_roll', action='store_true')
+
+    args = parser.parse_args()
+    print(args)
+    main(args)
