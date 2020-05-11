@@ -36,7 +36,9 @@ class Datacol(EClient, EWrapper):
     def init(self, contract, date, t, duration, outfile):
         return lambda : self._request_bars(contract, date, t, duration, outfile)
 
+    ''' Process '''
     def process(self, request_list:[]=None ):
+        ''' Single quotes '''
         if request_list is not None:
             self.request_list = request_list
 
