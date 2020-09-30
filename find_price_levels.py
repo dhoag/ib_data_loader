@@ -21,12 +21,19 @@ def main(args):
     es_bars[['Open','High', 'Low', 'Close', 'Volume', 'count', 'WAP']] = es_bars[['Open','High', 'Low', 'Close', 'Volume', 'count', 'WAP']].apply(pd.to_numeric)
     es_bars['date_time'] = es_bars.date.apply(str) + ' ' +es_bars.timestamp
     es_bars.date_time = es_bars.date_time.apply(pd.to_datetime)
+    #Round to nearest dollar and group by price
     es_bars['wap_rnd'] = es_bars['WAP'].round(0)
     grouped_bars : pd.DataFrame = es_bars.groupby('wap_rnd').sum()
+    #Shrink to just volume data
     grouped_bars = grouped_bars[['Volume']]
     counts : pd.Series = es_bars.groupby('wap_rnd').count()
+    #Add counts at each price level
     grouped_bars['bar_count'] = counts['Close']
-    grouped_bars.to_csv('tmp.csv', header=True)
+    #grouped_bars.to_csv('tmp.csv', header=True)
+
+    print(grouped_bars[grouped_bars.Volume > np.percentile(grouped_bars.Volume, 95)])
+    print(grouped_bars[grouped_bars.bar_count > np.percentile(grouped_bars.bar_count, 95)])
+
     #print(grouped_bars.describe())
     #print(counts.describe())
 
