@@ -64,9 +64,8 @@ class Datacol(EClient, EWrapper):
                 time.sleep(15)
                 self.current_request()
         elif id not in (2104, 2106): #Market data connection
-            print('[' + str(id) + '] ' + msg)
-            if self.request_in_flight:
-                exit()
+            print('[' + str(id) + '] error ' + msg)
+            #-- Can't exit() as lots of non-errors come from here
 
     @iswrapper
     def winError(self, *args):

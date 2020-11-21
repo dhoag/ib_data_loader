@@ -34,10 +34,11 @@ def determine_expiry(trade_date: pd.Timestamp, date_roll=False):
 def main(args):
     symbol = args.symbol
     date = args.day
-    thirty_min = args.thirty_min
     file_name = symbol + '_' + date + '.bars'
-    if thirty_min:
+    if args.thirty_min:
         file_name = symbol + '_30_min_' + date + '.bars'
+    if args.two_hours:
+        file_name = symbol + '_120_min_' + date + '.bars'
     if args.date_roll:
         file_name = file_name + 'T'
 
@@ -45,24 +46,25 @@ def main(args):
 
     try:
         collector = datacol.Datacol()
+        print('Collecting', date, 'data for', contract)
+        with open(file_name, 'w') as outfile:
+            thread = Thread(target=collector.run)
+            thread.start()
+
+            if args.thirty_min:
+                data_list = thirty_min_bars(collector, contract, date, outfile)
+            elif args.two_hours:
+                data_list = two_hour_bars(collector, contract, date, outfile)
+            else:
+                data_list = five_sec_bars(collector, contract, date, outfile)
+
+            collector.process(data_list)
+            while len(data_list) > 0 or collector.request_in_flight == True:
+                print(collector.count)
+                time.sleep(5)
     except Exception as e:
         print('Problem collecting:', e)
         sys.exit(1)
-
-    print('Collecting', date, 'data for', contract)
-
-    with open(file_name, 'w') as outfile:
-        thread = Thread(target=collector.run)
-        thread.start()
-
-        if thirty_min:
-            data_list = thirty_min_bars(collector, contract, date, outfile)
-        else:
-            data_list = five_sec_bars(collector, contract, date, outfile)
-        collector.process(data_list)
-        while len(data_list) > 0 or collector.request_in_flight == True:
-            print(collector.count)
-            time.sleep(5)
 
     collector.drop_connection()
     print("All done.")
@@ -83,8 +85,13 @@ def get_contract(symbol:str, date, date_roll=False):
     contract.includeExpired = 1
     return contract
 
+def two_hour_bars(collector, contract, date, outfile)-> []:
+    data_list = []
+    collector.bar_size = '2 hours'
+    data_list.append(collector.init(contract, date, '17:15:00', '60 D', outfile))
+    return data_list
 
-def thirty_min_bars(collector, contract, date, outfile):
+def thirty_min_bars(collector, contract, date, outfile) -> []:
     data_list = []
     collector.bar_size = '30 mins'
     data_list.append(collector.init(contract, date, '17:15:00', '60 D', outfile))
@@ -109,6 +116,7 @@ if __name__ == "__main__":
     parser.add_argument('symbol', type=str, help='a symbol to collect')
     parser.add_argument('day', type=str, help='A day for which to collect')
     parser.add_argument('--30', dest='thirty_min', action='store_true')
+    parser.add_argument('--120', dest='two_hours', action='store_true')
     parser.add_argument('--date_roll', action='store_true')
 
     args = parser.parse_args()
